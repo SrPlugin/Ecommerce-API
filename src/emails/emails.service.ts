@@ -1,38 +1,36 @@
 import { Injectable } from '@nestjs/common';
 import { Resend } from 'resend';
 import { ConfigService } from '@nestjs/config';
-import { Order } from '../orders/entities/order.entity';
+import { Order } from '@orders/entities/order.entity';
 
 @Injectable()
 export class EmailsService {
-  private resend: Resend;
+	private resend: Resend;
 
-  constructor(
-    private readonly configService: ConfigService,
-  ) {
-    const apiKey = this.configService.get<string>('RESEND_API_KEY');
-    if (!apiKey) {
-      throw new Error('RESEND_API_KEY is not configured');
-    }
-    this.resend = new Resend(apiKey);
-  }
+	constructor(private readonly configService: ConfigService) {
+		const apiKey = this.configService.get<string>('RESEND_API_KEY');
+		if (!apiKey) {
+			throw new Error('RESEND_API_KEY is not configured');
+		}
+		this.resend = new Resend(apiKey);
+	}
 
-  async sendOrderEmail(order: Order): Promise<void> {
-    const emailHtml = this.generateOrderEmailHtml(order);
-    const emailSubject = `Order Confirmation - ${order.customer_identifier}`;
+	async sendOrderEmail(order: Order): Promise<void> {
+		const emailHtml = this.generateOrderEmailHtml(order);
+		const emailSubject = `Order Confirmation - ${order.customer_identifier}`;
 
-    await this.resend.emails.send({
-      from: this.configService.get<string>('RESEND_FROM_EMAIL', 'onboarding@resend.dev'),
-      to: order.contact_email,
-      subject: emailSubject,
-      html: emailHtml,
-    });
-  }
+		await this.resend.emails.send({
+			from: this.configService.get<string>('RESEND_FROM_EMAIL', 'onboarding@resend.dev'),
+			to: order.contact_email,
+			subject: emailSubject,
+			html: emailHtml,
+		});
+	}
 
-  private generateOrderEmailHtml(order: Order): string {
-    const itemsHtml = order.items
-      .map(
-        (item) => `
+	private generateOrderEmailHtml(order: Order): string {
+		const itemsHtml = order.items
+			.map(
+				(item) => `
       <tr>
         <td style="padding: 10px; border-bottom: 1px solid #ddd;">${item.product.name}</td>
         <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center;">${item.quantity}</td>
@@ -40,10 +38,10 @@ export class EmailsService {
         <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">$${(item.price_at_purchase * item.quantity).toFixed(2)}</td>
       </tr>
     `,
-      )
-      .join('');
+			)
+			.join('');
 
-    return `
+		return `
       <!DOCTYPE html>
       <html>
       <head>
@@ -109,5 +107,5 @@ export class EmailsService {
       </body>
       </html>
     `;
-  }
+	}
 }

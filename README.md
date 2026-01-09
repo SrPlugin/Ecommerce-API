@@ -20,6 +20,7 @@
 
 - [Overview](#overview)
 - [Features](#features)
+- [Extensive Documentation](https://deepwiki.com/SrPlugin/Ecommerce-API)
 - [Tech Stack](#tech-stack)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
@@ -64,10 +65,11 @@ This backend is integrated with **N8N** workflow automation platform, which mana
 - ✅ Environment-based configuration
 - ✅ Global exception handling
 - ✅ Request validation pipeline 
-- ✅ Security best practices 
+- ✅ Security best practices
+- ✅ New Implementation (Helmet, Rate Limit and Swagger/OpenAPI)
 - ❌ Testing framework setup (Jest) (Pending)
-- ❌ Strong security with CORS, HELMET, JWT, RATE LIMITING (Pending)
-- ❌ API Documentation with Swagger/OpenAPI (contributions welcome) (Pending)
+- ❌ Strong security with CORS, JWT(Pending)
+- ❌ Clean Architecture and Design Patterns (MicroServices ??)
 
 ## 🛠 Tech Stack
 
@@ -153,6 +155,8 @@ DB_USERNAME=your_username
 DB_PASSWORD=your_password
 DB_DATABASE=your_database_name
 
+NODE_ENV=production || development
+
 # Resend Email Configuration
 RESEND_API_KEY=re_your_api_key_here
 RESEND_FROM_EMAIL=noreply@yourdomain.com
@@ -168,6 +172,7 @@ RESEND_FROM_EMAIL=noreply@yourdomain.com
 | `DB_USERNAME` | Database username | Yes | - |
 | `DB_PASSWORD` | Database password | Yes | - |
 | `DB_DATABASE` | Database name | Yes | - |
+| `NODE_ENV` | Development Environment | Yes | `development or production`  |
 | `RESEND_API_KEY` | Resend API key | Yes | - |
 | `RESEND_FROM_EMAIL` | Sender email address | No | `onboarding@resend.dev` |
 
@@ -245,156 +250,6 @@ To use the N8N workflow:
 
 The workflow will then manage all backend operations through the defined API endpoints.
 
-## 📚 API Documentation
-
-All endpoints are prefixed with `/api`.
-
-### Products
-
-#### Create Product
-```http
-POST /api/products
-Content-Type: application/json
-
-{
-  "name": "Product Name",
-  "description": "Product description",
-  "price": 99.99,
-  "stock": 100,
-  "slug": "product-slug" // Optional, auto-generated if not provided
-}
-```
-
-#### Get All Products
-```http
-GET /api/products
-```
-
-#### Get Product by ID
-```http
-GET /api/products/:id
-```
-
-#### Update Product
-```http
-PATCH /api/products/:id
-Content-Type: application/json
-
-{
-  "name": "Updated Name",
-  "price": 89.99,
-  "stock": 50
-}
-```
-
-#### Delete Product
-```http
-DELETE /api/products/:id
-```
-
-### Orders
-
-#### Create Order
-```http
-POST /api/orders
-Content-Type: application/json
-
-{
-  "contact_email": "customer@example.com",
-  "contact_name": "John Doe",
-  "shipping_address": "123 Main St, City, Country",
-  "customer_identifier": 12345678,
-  "items": [
-    {
-      "product_id": "uuid-of-product",
-      "quantity": 2
-    }
-  ]
-}
-```
-
-**Note**: Automatically sends confirmation email upon successful order creation.
-
-#### Get All Orders
-```http
-GET /api/orders
-```
-
-#### Get Order by ID
-```http
-GET /api/orders/:id
-```
-
-#### Update Order
-```http
-PATCH /api/orders/:id
-Content-Type: application/json
-
-{
-  "status": "delivered",
-  "items": [
-    {
-      "product_id": "uuid-of-product",
-      "quantity": 3
-    }
-  ]
-}
-```
-
-#### Delete Order
-```http
-DELETE /api/orders/:id
-```
-
-### Emails
-
-#### Resend Order Confirmation Email
-```http
-POST /api/emails/order/:orderId
-```
-
-### Seed
-
-#### Seed Products Database
-```http
-POST /api/seed/products
-```
-Inserts 30 sample products into the database. Only works if database is empty.
-
-#### Clear All Products
-```http
-DELETE /api/seed/products
-```
-Deletes all products and related order items from the database.
-
-## 🗄 Database Schema
-
-### Product Entity
-- `id` (UUID, Primary Key)
-- `name` (Text)
-- `description` (Text)
-- `price` (Numeric)
-- `slug` (Text, Unique)
-- `stock` (Numeric)
-
-### Order Entity
-- `id` (UUID, Primary Key)
-- `contact_email` (Text)
-- `contact_name` (Text)
-- `shipping_address` (Text)
-- `status` (Enum: pending, delivered, cancelled, paid)
-- `total_amount` (Numeric)
-- `customer_identifier` (Numeric)
-- `created_at` (Date)
-- `updated_at` (Date)
-- `items` (One-to-Many relationship with OrderItem)
-
-### OrderItem Entity
-- `id` (UUID, Primary Key)
-- `order_id` (Foreign Key to Order)
-- `product_id` (Foreign Key to Product)
-- `quantity` (Numeric)
-- `price_at_purchase` (Numeric)
 
 ## 🏃 Running the Application
 
@@ -490,7 +345,8 @@ Contributions are welcome! Please follow these steps:
 ### Code Style
 
 - Follow TypeScript best practices
-- Use ESLint and Prettier configurations
+- Use Biome.js for linter
+- SWC for compiler
 - Write meaningful commit messages
 - Add tests for new features
 - Update documentation as needed
@@ -501,7 +357,6 @@ We welcome contributions in the following areas:
 
 - **Testing**: Help improve test coverage, add unit tests, integration tests, or E2E tests
 - **Security**: Implement security best practices, add authentication, authorization, rate limiting, or security headers
-- **Documentation**: Enhance API documentation with Swagger/OpenAPI integration, improve README, add code examples, or create guides
 
 Your contributions in these areas are highly valued and will help make this project more robust and developer-friendly!
 

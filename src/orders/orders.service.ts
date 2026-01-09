@@ -1,179 +1,158 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { CreateOrderDto } from './dto/create-order.dto';
-import { UpdateOrderDto } from './dto/update-order.dto';
+import { CreateOrderDto, UpdateOrderDto } from '@orders/dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { Order } from './entities/order.entity';
-import { OrderItem } from './entities/order-item.entity';
-import { Product } from '../products/entities/product.entity';
-import { CreateOrderItemDto } from './dto/create-order-item.dto';
-import { EmailsService } from '../emails/emails.service';
+import { Order, OrderItem } from '@orders/entities';
+import { Product } from '@products/entities/product.entity';
+import { CreateOrderItemDto } from '@orders/dto';
+import { EmailsService } from '@emails/emails.service';
 
 @Injectable()
 export class OrdersService {
-  constructor(
-    @InjectRepository(Order)
-    private readonly orderRepository: Repository<Order>,
-    @InjectRepository(OrderItem)
-    private readonly orderItemRepository: Repository<OrderItem>,
-    @InjectRepository(Product)
-    private readonly productRepository: Repository<Product>,
-    private readonly dataSource: DataSource,
-    private readonly emailsService: EmailsService,
-  ) {}
+	constructor(
+		@InjectRepository(Order)
+		private readonly orderRepository: Repository<Order>,
+		@InjectRepository(OrderItem)
+		private readonly orderItemRepository: Repository<OrderItem>,
+		@InjectRepository(Product)
+		private readonly productRepository: Repository<Product>,
+		private readonly dataSource: DataSource,
+		private readonly emailsService: EmailsService,
+	) {}
 
-  async create(createOrderDto: CreateOrderDto) {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+	async create(createOrderDto: CreateOrderDto): Promise<Order> {
+		const queryRunner = this.dataSource.createQueryRunner();
+		await queryRunner.connect();
+		await queryRunner.startTransaction();
 
-    try {
-      const productsWithQuantity = await this.validateAndGetProducts(
-        createOrderDto.items,
-      );
+		try {
+			const productsWithQuantity = await this.validateAndGetProducts(createOrderDto.items);
 
-      const { orderItems, totalAmount } = await this.createOrderItems(
-        productsWithQuantity,
-      );
+			const { orderItems, totalAmount } = await this.createOrderItems(productsWithQuantity);
 
-      await this.updateProductsStock(productsWithQuantity);
+			await this.updateProductsStock(productsWithQuantity);
 
-      const order = this.orderRepository.create({
-        ...createOrderDto,
-        total_amount: totalAmount,
-        created_at: new Date(),
-        updated_at: new Date(),
-        items: orderItems,
-      });
+			const order = this.orderRepository.create({
+				...createOrderDto,
+				total_amount: totalAmount,
+				created_at: new Date(),
+				updated_at: new Date(),
+				items: orderItems,
+			});
 
-      const savedOrder = await queryRunner.manager.save(order);
-      await queryRunner.commitTransaction();
-      
-      try {
-        await this.emailsService.sendOrderEmail(savedOrder);
-      } catch (emailError) {
-        console.error('Error sending order confirmation email:', emailError);
-      }
-      
-      return savedOrder;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
-  }
+			const savedOrder = await queryRunner.manager.save(order);
+			await queryRunner.commitTransaction();
 
-  async findAll() {
-    return this.orderRepository.find({
-      relations: ['items', 'items.product'],
-    });
-  }
+			try {
+				await this.emailsService.sendOrderEmail(savedOrder);
+			} catch (emailError) {
+				console.error('Error sending order confirmation email:', emailError);
+			}
 
-  async findOne(id: string) {
-    const order = await this.orderRepository.findOne({
-      where: { id },
-      relations: ['items', 'items.product'],
-    });
-    if (!order) {
-      throw new NotFoundException(`Order not found with id: ${id}`);
-    }
-    return order;
-  }
+			return savedOrder;
+		} catch (error) {
+			await queryRunner.rollbackTransaction();
+			throw error;
+		} finally {
+			await queryRunner.release();
+		}
+	}
 
-  async update(id: string, updateOrderDto: UpdateOrderDto) {
-    const order = await this.findOne(id);
+	async findAll(): Promise<Order[]> {
+		return this.orderRepository.find({
+			relations: ['items', 'items.product'],
+		});
+	}
 
-    if (updateOrderDto.items?.length) {
-      await this.orderItemRepository.delete({ order: { id } });
+	async findOne(id: string): Promise<Order> {
+		const order = await this.orderRepository.findOne({
+			where: { id },
+			relations: ['items', 'items.product'],
+		});
+		if (!order) {
+			throw new NotFoundException(`Order not found with id: ${id}`);
+		}
+		return order;
+	}
 
-      const productsWithQuantity = await this.validateAndGetProducts(
-        updateOrderDto.items,
-      );
+	async update(id: string, updateOrderDto: UpdateOrderDto): Promise<Order> {
+		const order = await this.findOne(id);
 
-      const { orderItems, totalAmount } = await this.createOrderItems(
-        productsWithQuantity,
-        order,
-      );
+		if (updateOrderDto.items?.length) {
+			await this.orderItemRepository.delete({ order: { id } });
 
-      await this.orderItemRepository.save(orderItems);
-      order.total_amount = totalAmount;
-    }
+			const productsWithQuantity = await this.validateAndGetProducts(updateOrderDto.items);
 
-    const { items, ...updateData } = updateOrderDto;
-    Object.assign(order, {
-      ...updateData,
-      updated_at: new Date(),
-    });
+			const { orderItems, totalAmount } = await this.createOrderItems(productsWithQuantity, order);
 
-    return this.orderRepository.save(order);
-  }
+			await this.orderItemRepository.save(orderItems);
+			order.total_amount = totalAmount;
+		}
 
-  async remove(id: string) {
-    const order = await this.findOne(id);
-    await this.orderRepository.remove(order);
-    return { message: 'Order deleted successfully' };
-  }
+		const { items, ...updateData } = updateOrderDto;
+		Object.assign(order, {
+			...updateData,
+			updated_at: new Date(),
+		});
 
-  private async validateAndGetProducts(
-    items: CreateOrderItemDto[],
-  ): Promise<Array<{ product: Product; quantity: number }>> {
-    const productIds = items.map((item) => item.product_id);
-    const products = await this.productRepository.findBy(
-      productIds.map((id) => ({ id })),
-    );
+		return this.orderRepository.save(order);
+	}
 
-    if (products.length !== productIds.length) {
-      const foundIds = products.map((p) => p.id);
-      const missingId = productIds.find((id) => !foundIds.includes(id));
-      throw new NotFoundException(`Product with id ${missingId} not found`);
-    }
+	async remove(id: string): Promise<{ message: string }> {
+		const order = await this.findOne(id);
+		await this.orderRepository.remove(order);
+		return { message: 'Order deleted successfully' };
+	}
 
-    return items.map((item) => {
-      const product = products.find((p) => p.id === item.product_id)!;
-      if (product.stock < item.quantity) {
-        throw new BadRequestException(
-          `Insufficient stock for product ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`,
-        );
-      }
-      return { product, quantity: item.quantity };
-    });
-  }
+	private async validateAndGetProducts(
+		items: CreateOrderItemDto[],
+	): Promise<Array<{ product: Product; quantity: number }>> {
+		const productIds = items.map((item) => item.product_id);
+		const products = await this.productRepository.findBy(productIds.map((id) => ({ id })));
 
-  private async createOrderItems(
-    productsWithQuantity: Array<{ product: Product; quantity: number }>,
-    order?: Order,
-  ): Promise<{ orderItems: OrderItem[]; totalAmount: number }> {
-    const orderItems = productsWithQuantity.map(({ product, quantity }) =>
-      this.orderItemRepository.create({
-        product,
-        quantity,
-        price_at_purchase: product.price,
-        ...(order && { order }),
-      }),
-    );
+		if (products.length !== productIds.length) {
+			const foundIds = products.map((p) => p.id);
+			const missingId = productIds.find((id) => !foundIds.includes(id));
+			throw new NotFoundException(`Product with id ${missingId} not found`);
+		}
 
-    const totalAmount = productsWithQuantity.reduce(
-      (sum, { product, quantity }) => sum + product.price * quantity,
-      0,
-    );
+		return items.map((item) => {
+			const product = products.find((p) => p.id === item.product_id)!;
+			if (product.stock < item.quantity) {
+				throw new BadRequestException(
+					`Insufficient stock for product ${product.name}. Available: ${product.stock}, Requested: ${item.quantity}`,
+				);
+			}
+			return { product, quantity: item.quantity };
+		});
+	}
 
-    return { orderItems, totalAmount };
-  }
+	private async createOrderItems(
+		productsWithQuantity: Array<{ product: Product; quantity: number }>,
+		order?: Order,
+	): Promise<{ orderItems: OrderItem[]; totalAmount: number }> {
+		const orderItems = productsWithQuantity.map(({ product, quantity }) =>
+			this.orderItemRepository.create({
+				product,
+				quantity,
+				price_at_purchase: product.price,
+				...(order && { order }),
+			}),
+		);
 
-  private async updateProductsStock(
-    productsWithQuantity: Array<{ product: Product; quantity: number }>,
-  ): Promise<void> {
-    await Promise.all(
-      productsWithQuantity.map(({ product, quantity }) => {
-        product.stock -= quantity;
-        return this.productRepository.save(product);
-      }),
-    );
-  }
+		const totalAmount = productsWithQuantity.reduce((sum, { product, quantity }) => sum + product.price * quantity, 0);
 
+		return { orderItems, totalAmount };
+	}
 
-
-    
-  }
-
+	private async updateProductsStock(
+		productsWithQuantity: Array<{ product: Product; quantity: number }>,
+	): Promise<void> {
+		await Promise.all(
+			productsWithQuantity.map(({ product, quantity }) => {
+				product.stock -= quantity;
+				return this.productRepository.save(product);
+			}),
+		);
+	}
+}

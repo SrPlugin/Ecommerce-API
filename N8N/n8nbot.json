@@ -1,206 +1,194 @@
 {
-    "name": "Agente-Compra",
-    "nodes": [
-      {
-        "parameters": {
-          "public": true,
-          "mode": "webhook",
-          "options": {}
-        },
-        "type": "@n8n/n8n-nodes-langchain.chatTrigger",
-        "typeVersion": 1.4,
-        "position": [
-          0,
-          0
-        ],
-        "id": "76fc0953-24be-42be-9fee-9b58ac61462e",
-        "name": "When chat message received",
-        "webhookId": "60e58fd4-1ed5-47a9-ae07-8d0f2c4441e0"
-      },
-      {
-        "parameters": {
-          "options": {
-            "systemMessage": "Eres \"Asistente Plus\", un experto en gestión de compras y ventas. Tu objetivo principal es facilitar la consulta de productos y la creación de órdenes de compra, manteniendo siempre un tono amable, profesional, breve y utilizando tácticas de marketing persuasivas.\n\n---\n## RESTRICCIÓN DE CONOCIMIENTO (CLAVE)\n1.  **ÚNICA FUENTE DE VERDAD:** Tu único conocimiento sobre productos, precios y disponibilidad proviene de la herramienta **\"get products\"**.\n2.  **PROHIBICIÓN:** NUNCA, bajo ninguna circunstancia, debes inventar nombres, precios, descripciones o la existencia de productos que no hayan sido devueltos por la herramienta. Solo usa la data que la herramienta proporciona.\n\n---\n## REGLAS DE VENTA Y COMUNICACIÓN:\n1.  **Tono:** Sé siempre amable, proactivo y utiliza un lenguaje de ventas excelente. Sé breve y conciso para optimizar la experiencia del cliente.\n2.  **Consulta de Productos:** Cuando el cliente pregunte por productos:\n    * **OBLIGATORIO:** Utiliza SIEMPRE la herramienta **\"get products\"** para obtener la lista más reciente del backend.\n    * **Presentación:** Muestra la lista de productos disponibles sin mencionar el precio o la cantidad de stock. Solo menciona si un producto está agotado.\n3.  **Manejo de Precios:** Solo proporciona el precio unitario si el cliente lo solicita explícitamente.\n4.  **Manejo de Stock:** La cantidad de stock es información interna. Solo revela al cliente si un producto está **agotado**.\n\n---\n## PROTOCOLO DE ORDEN DE COMPRA:\n1.  **Activación:** Cuando el cliente exprese su deseo de crear una orden (\"Quiero hacer una orden de compra\"), debes iniciar el protocolo de recolección de datos.\n2.  **Datos Obligatorios (Protocolo de Ventas):** Antes de ejecutar la orden, pide los siguientes datos de forma consecutiva: **identificación (ID), correo electrónico** y **nombre completo**.\n3.  **Continuación:** Una vez que tengas estos tres datos, invita al cliente a continuar indicando los productos y cantidades que desea pedir para ejecutar la orden de compra.\n\n\n\n## PROTOCOLO DE ORDEN DE COMPRA (EXTRACCIÓN DE DATOS CRÍTICA)\n\nPara el proceso de creación de órdenes, la herramienta 'Create Order' espera un objeto JSON con la siguiente estructura de EJEMPLO:\n\n{\n    \"contact_email\": \"customer@example.com\",\n    \"contact_name\": \"John Doe\",\n    \"shipping_address\": \"123 Main St, City, Country\",\n    \"customer_identifier\": 12345678,\n    \"items\": [\n    {\n      \"product_id\": \"3e0a8228-8e70-45c8-bf03-5a72cf7945bf\",\n      \"quantity\": 2\n    }\n    ]\n}\n\n1.  **Activación:** Cuando el cliente diga que quiere crear una orden, tu primer objetivo es obtener los 5 datos clave.\n2.  **Datos Clave Obligatorios:** Los datos que debes extraer para la orden son:\n    * **contact_email** (String, ej. juan@ejemplo.com)\n    * **contact_name** (String, Nombre completo)\n    * **customer_identifier** (Number, ID o Cédula)\n    * **shipping_address** (String, Dirección de envío)\n    * **items** (Array, Lista de productos)."
-          }
-        },
-        "type": "@n8n/n8n-nodes-langchain.agent",
-        "typeVersion": 3,
-        "position": [
-          208,
-          0
-        ],
-        "id": "cfdd0c9b-7de6-4558-8a0b-7431350d9fbb",
-        "name": "AI Agent"
-      },
-      {
-        "parameters": {
-          "options": {
-            "maxOutputTokens": 600
-          }
-        },
-        "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
-        "typeVersion": 1,
-        "position": [
-          -80,
-          256
-        ],
-        "id": "fe75e7ed-46f8-40e3-b9f9-c42b796fe3b5",
-        "name": "Google Gemini Chat Model",
-        "credentials": {
-          "googlePalmApi": {
-            "id": "VCJ79nTNxBhQElTl",
-            "name": "Google Gemini(PaLM) Api account"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "contextWindowLength": 20
-        },
-        "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
-        "typeVersion": 1.3,
-        "position": [
-          144,
-          320
-        ],
-        "id": "5f94bf96-7369-4721-97d8-c8a324351191",
-        "name": "Postgres Chat Memory",
-        "credentials": {
-          "postgres": {
-            "id": "VXcb2p36VUGeyvwC",
-            "name": "Postgres account"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "toolDescription": "Este endpoint es para crear una orden. Cuando el cliente quiera crear una orden. El modelo gemini debera mandar a este endpoint la data que extrajo",
-          "method": "POST",
-          "url": "http://yourhost:3000/api/orders",
-          "sendBody": true,
-          "bodyParameters": {
-            "parameters": [
-              {
-                "name": "contact_email",
-                "value": "={{ $json.contact_email }}"
-              },
-              {
-                "name": "contact_name",
-                "value": "={{ $json.contact_name }}"
-              },
-              {
-                "name": "shipping_address",
-                "value": "={{ $json.shipping_address }}"
-              },
-              {
-                "name": "customer_identifier",
-                "value": "={{ $json.customer_identifier }}"
-              },
-              {
-                "name": "items",
-                "value": "={{ $json.items }}"
-              }
-            ]
-          },
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequestTool",
-        "typeVersion": 4.3,
-        "position": [
-          352,
-          304
-        ],
-        "id": "69cb2f55-404f-4973-93bc-3cee09d98df5",
-        "name": "Create Order"
-      },
-      {
-        "parameters": {
-          "toolDescription": "Utiliza SIEMPRE esta herramienta para obtener la lista actual de productos, su disponibilidad, stock o cualquier detalle de la oferta. Esta herramienta ejecuta un GET a tu backend. EL MODELO DEBE USAR ÚNICAMENTE LA INFORMACIÓN DEVUELTA POR ESTA HERRAMIENTA para responder al cliente sobre productos.",
-          "url": "http://yourhost:3000/api/products",
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequestTool",
-        "typeVersion": 4.3,
-        "position": [
-          544,
-          208
-        ],
-        "id": "4891c6db-30fd-4f7a-83eb-8932f74c8657",
-        "name": "Get Products"
-      }
-    ],
-    "pinData": {},
-    "connections": {
-      "When chat message received": {
-        "main": [
-          [
-            {
-              "node": "AI Agent",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Google Gemini Chat Model": {
-        "ai_languageModel": [
-          [
-            {
-              "node": "AI Agent",
-              "type": "ai_languageModel",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "AI Agent": {
-        "main": [
-          []
-        ]
-      },
-      "Postgres Chat Memory": {
-        "ai_memory": [
-          [
-            {
-              "node": "AI Agent",
-              "type": "ai_memory",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Create Order": {
-        "ai_tool": [
-          [
-            {
-              "node": "AI Agent",
-              "type": "ai_tool",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Get Products": {
-        "ai_tool": [
-          [
-            {
-              "node": "AI Agent",
-              "type": "ai_tool",
-              "index": 0
-            }
-          ]
-        ]
-      }
-    },
-    "active": true,
-    "settings": {
-      "executionOrder": "v1"
-    },
-    "versionId": "e7863d03-cfa3-43b2-8eea-35b96ae91058",
-    "meta": {
-      "templateCredsSetupCompleted": true,
-      "instanceId": "ca27fc19f34d119b1be8cee2775f9f7f70844f74adb2a1793e2ec86b79dca360"
-    },
-    "id": "QvThtgUBPk2iMqFA",
-    "tags": []
-  }
+	"name": "Purchasing Agent",
+	"nodes": [
+		{
+			"parameters": {
+				"public": true,
+				"mode": "webhook",
+				"options": {}
+			},
+			"type": "@n8n/n8n-nodes-langchain.chatTrigger",
+			"typeVersion": 1.4,
+			"position": [0, 0],
+			"id": "ad731937-338b-4c61-a71b-888b097cdd21",
+			"name": "When chat message received",
+			"webhookId": "60e58fd4-1ed5-47a9-ae07-8d0f2c4441e0"
+		},
+		{
+			"parameters": {
+				"options": {
+					"systemMessage": "You are “Asistente Plus”, an expert in purchase and sales management. Your primary objective is to facilitate product inquiries and the creation of purchase orders, always maintaining a friendly, professional, and concise tone, while using persuasive marketing tactics.\n\nKNOWLEDGE RESTRICTION (CRITICAL)\n\nSINGLE SOURCE OF TRUTH: Your only source of knowledge about products, prices, and availability comes from the “get products” tool.\n\nPROHIBITION: You must NEVER, under any circumstances, invent product names, prices, descriptions, or the existence of products that were not returned by the tool. You may only use the data provided by this tool.\n\nSALES AND COMMUNICATION RULES:\n\nTone: Always be friendly, proactive, and use excellent sales-oriented language. Be brief and concise to optimize the customer experience.\n\nProduct Inquiry: When the customer asks about products:\n\nMANDATORY: ALWAYS use the “get products” tool to retrieve the most up-to-date list from the backend.\n\nPresentation: Display the list of available products without mentioning price or stock quantity. Only indicate if a product is out of stock.\n\nPrice Handling: Only provide the unit price if the customer explicitly requests it.\n\nStock Handling: Stock quantity is internal information. Only disclose to the customer if a product is out of stock.\n\nPURCHASE ORDER PROTOCOL:\n\nActivation: When the customer expresses their intent to create an order (“I want to place a purchase order”), you must initiate the data collection protocol.\n\nMandatory Data (Sales Protocol): Before executing the order, request the following information consecutively: identification (ID), email address, and full name.\n\nContinuation: Once you have these three pieces of information, invite the customer to proceed by indicating the products and quantities they wish to order in order to execute the purchase order.\n\nPURCHASE ORDER PROTOCOL (CRITICAL DATA EXTRACTION)\n\nFor the order creation process, the “Create Order” tool expects a JSON object with the following example structure:\n\n{\n  \"contact_email\": \"customer@example.com\",\n  \"contact_name\": \"John Doe\",\n  \"shipping_address\": \"123 Main St, City, Country\",\n  \"customer_identifier\": 12345678,\n  \"items\": [\n    {\n      \"product_id\": \"3e0a8228-8e70-45c8-bf03-5a72cf7945bf\",\n      \"quantity\": 2\n    }\n  ]\n}\n\n\nActivation: When the customer says they want to create an order, your first objective is to obtain the 5 key data points.\n\nMandatory Key Data: The data you must extract for the order are:\n\ncontact_email (String, e.g., juan@example.com\n)\n\ncontact_name (String, Full name)\n\ncustomer_identifier (Number, ID or National Identification)\n\nshipping_address (String, Shipping address)\n\nitems (Array, List of products)"
+				}
+			},
+			"type": "@n8n/n8n-nodes-langchain.agent",
+			"typeVersion": 3,
+			"position": [208, 0],
+			"id": "cd2c6213-6022-4e72-9354-f879148b35bd",
+			"name": "AI Agent"
+		},
+		{
+			"parameters": {
+				"options": {
+					"maxOutputTokens": 600
+				}
+			},
+			"type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+			"typeVersion": 1,
+			"position": [-80, 256],
+			"id": "cd0651af-b634-4a29-a585-1c66ebb0fbf4",
+			"name": "Google Gemini Chat Model"
+		},
+		{
+			"parameters": {
+				"contextWindowLength": 20
+			},
+			"type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+			"typeVersion": 1.3,
+			"position": [144, 320],
+			"id": "76206c48-5e69-4684-9123-be6e14531f47",
+			"name": "Postgres Chat Memory"
+		},
+		{
+			"parameters": {
+				"toolDescription": "This endpoint is used to create an order. When the customer wants to place an order, the Gemini model must send to this endpoint the data it has extracted.",
+				"method": "POST",
+				"url": "http://yourhost:3000/api/orders",
+				"sendBody": true,
+				"bodyParameters": {
+					"parameters": [
+						{
+							"name": "contact_email",
+							"value": "={{ $json.contact_email }}"
+						},
+						{
+							"name": "contact_name",
+							"value": "={{ $json.contact_name }}"
+						},
+						{
+							"name": "shipping_address",
+							"value": "={{ $json.shipping_address }}"
+						},
+						{
+							"name": "customer_identifier",
+							"value": "={{ $json.customer_identifier }}"
+						},
+						{
+							"name": "items",
+							"value": "={{ $json.items }}"
+						}
+					]
+				},
+				"options": {}
+			},
+			"type": "n8n-nodes-base.httpRequestTool",
+			"typeVersion": 4.3,
+			"position": [352, 304],
+			"id": "1f4deb21-7c5d-42b5-80c2-7aad69dcb15f",
+			"name": "Create Order"
+		},
+		{
+			"parameters": {
+				"toolDescription": "Use this tool at all times to obtain the current list of products, their availability, stock levels, or any offer-related details. This tool performs a GET request to your backend. THE MODEL MUST RELY EXCLUSIVELY ON THE INFORMATION RETURNED BY THIS TOOL when responding to customers about products.",
+				"url": "http://yourhost:3000/api/products",
+				"options": {}
+			},
+			"type": "n8n-nodes-base.httpRequestTool",
+			"typeVersion": 4.3,
+			"position": [544, 208],
+			"id": "a78293a2-bf9b-42e1-accf-b5b21b504b38",
+			"name": "Get Products"
+		},
+		{
+			"parameters": {
+				"toolDescription": "Use this tool at all times to obtain the current list of orders, including customer details such as identification, location, full name, and email address, as well as order information such as products, quantities, prices, and stock. This tool queries the backend directly, and THE MODEL MUST RELY EXCLUSIVELY ON THE INFORMATION RETURNED BY THIS TOOL when responding about orders.",
+				"url": "http://yourhost:3000/api/orders",
+				"options": {}
+			},
+			"type": "n8n-nodes-base.httpRequestTool",
+			"typeVersion": 4.3,
+			"position": [688, 144],
+			"id": "fa9c1a3f-be38-4ecc-acb7-c1197d3e18dc",
+			"name": "Get Orders"
+		}
+	],
+	"pinData": {},
+	"connections": {
+		"When chat message received": {
+			"main": [
+				[
+					{
+						"node": "AI Agent",
+						"type": "main",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Google Gemini Chat Model": {
+			"ai_languageModel": [
+				[
+					{
+						"node": "AI Agent",
+						"type": "ai_languageModel",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Postgres Chat Memory": {
+			"ai_memory": [
+				[
+					{
+						"node": "AI Agent",
+						"type": "ai_memory",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Create Order": {
+			"ai_tool": [
+				[
+					{
+						"node": "AI Agent",
+						"type": "ai_tool",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Get Products": {
+			"ai_tool": [
+				[
+					{
+						"node": "AI Agent",
+						"type": "ai_tool",
+						"index": 0
+					}
+				]
+			]
+		},
+		"Get Orders": {
+			"ai_tool": [
+				[
+					{
+						"node": "AI Agent",
+						"type": "ai_tool",
+						"index": 0
+					}
+				]
+			]
+		}
+	},
+	"active": false,
+	"settings": {
+		"executionOrder": "v1",
+		"availableInMCP": false
+	},
+	"versionId": "b95ce18f-46fd-43ed-ba2b-4e5653097662",
+	"meta": {
+		"instanceId": "cb0b658c80ecdf042007bd0d4a7eecc01bfffa73a58232ac9712ac16887b0221"
+	},
+	"id": "EuYLus7DIDRBIo2Y",
+	"tags": []
+}
